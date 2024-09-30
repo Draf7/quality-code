@@ -8,10 +8,16 @@ import {
 } from 'typeorm';
 import { Expose } from 'class-transformer';
 
+export enum OrderStatus {
+  PENDING = 'PENDING',
+  PAID = 'PAID',
+  SHIPPED = 'SHIPPED',
+  CANCELLED = 'CANCELLED',
+}
+
 @Entity()
 export class Order {
   static MAX_ITEMS = 5;
-
   static AMOUNT_MINIMUM = 5;
 
   @CreateDateColumn()
@@ -48,7 +54,7 @@ export class Order {
 
   @Column()
   @Expose({ groups: ['group_orders'] })
-  status: string;
+  status: string;   
 
   @Column({ nullable: true })
   @Expose({ groups: ['group_orders'] })

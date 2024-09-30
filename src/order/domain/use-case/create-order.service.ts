@@ -15,6 +15,8 @@ interface CreateOrder {
 
 @Injectable()
 export class CreateOrderService {
+    private orders: Order[] = [];
+
   public execute(createOrderDto: CreateOrder): string {
     const { items, customerName, shippingAddress, invoiceAddress } = createOrderDto;
 
@@ -48,5 +50,16 @@ export class CreateOrderService {
     }
 
     return totalAmount;
+  }
+
+  public payOrder(orderId: string): Order {
+    const order = this.orders.find(order => order.id === orderId);
+  
+    if (!order) {
+      throw new BadRequestException('Order not found');
+    }
+  
+    order.paidAt = new Date();
+    return order;
   }
 }
