@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
 import { Order } from 'src/order/domain/entity/order.entity';
 import { CreateOrderService } from '../domain/use-case/create-order.service';
 
@@ -26,5 +26,10 @@ export class OrderController {
   @Post()
   async createOrder(@Body() createOrderDto: CreateOrder): Promise<string> {
     return this.createOrderService.execute(createOrderDto);
+  }
+
+  @Put(':id/pay')
+  async payOrder(@Param('id') id: string): Promise<Order> {
+    return this.createOrderService.payOrder(id);
   }
 }
