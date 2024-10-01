@@ -22,7 +22,10 @@ export class Order {
 
   static AMOUNT_MINIMUM = 5;
 
-  static MAX_PRICE = 500;
+  static MAX_PAYMENT_AMOUNT = 500;
+
+  static DELIVERY_FEE = 5;
+
 
   @CreateDateColumn()
   @Expose({ groups: ['group_orders'] })
@@ -65,12 +68,28 @@ export class Order {
   paidAt: Date | null;
 
   pay(): void {
-    const MAX_PAYMENT_AMOUNT = 500;
 
-    if (this.status !== OrderStatus.PENDING || this.price > MAX_PAYMENT_AMOUNT) {
+    if (this.status !== OrderStatus.PENDING || this.price > Order.MAX_PAYMENT_AMOUNT) {
       throw new Error('Le paiement ne peut être effectué que si la commande est en attente et que le montant total est inférieur ou égal à 500€.');
     }
     this.status = OrderStatus.PAID;
     this.paidAt = new Date("NOW");
   }
+
+  isPaid(): boolean {
+    return this.status === OrderStatus.PAID;
+  }  
+
+  ship(): void {
+    if (this.status !== OrderStatus.PAID) {
+      throw new Error("L'expédition n'est possible que si la commande a été payée.");
+    }
+
+    if (!this.shippingAddress) {
+      throw new Error("L'expédition n'est pas possible car l'adresse de livraison n'est pas renseignée.");
+    }
+
+    this.status = OrderStatus.SHIPPED;
+  }
+
 }
