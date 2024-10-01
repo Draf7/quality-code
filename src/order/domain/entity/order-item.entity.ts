@@ -22,3 +22,9 @@ export class OrderItem {
   @ManyToOne(() => Order, (order) => order.orderItems)
   order: Order;
 }
+
+
+
+
+
+

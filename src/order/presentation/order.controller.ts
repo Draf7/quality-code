@@ -30,6 +30,6 @@ export class OrderController {
 
   @Put(':id/pay')
   async payOrder(@Param('id') id: string): Promise<Order> {
-    return this.createOrderService.payOrder(id);
+    return this.payOrder(id);
   }
 }
