@@ -12,8 +12,7 @@ export class PayOrderService {
       throw new NotFoundException('Pas de commande');
     }
 
-    order.status = OrderStatus.PAID;
-    order.paidAt = new Date('NOW');
+   order.pay();
 
     return this.orderRepository.save(order);
   }

@@ -22,6 +22,8 @@ export class Order {
 
   static AMOUNT_MINIMUM = 5;
 
+  static MAX_PRICE = 500;
+
   @CreateDateColumn()
   @Expose({ groups: ['group_orders'] })
   createdAt: Date;
@@ -61,4 +63,14 @@ export class Order {
   @Column({ nullable: true })
   @Expose({ groups: ['group_orders'] })
   paidAt: Date | null;
+
+  pay(): void {
+    const MAX_PAYMENT_AMOUNT = 500;
+
+    if (this.status !== OrderStatus.PENDING || this.price > MAX_PAYMENT_AMOUNT) {
+      throw new Error('Le paiement ne peut être effectué que si la commande est en attente et que le montant total est inférieur ou égal à 500€.');
+    }
+    this.status = OrderStatus.PAID;
+    this.paidAt = new Date("NOW");
+  }
 }
