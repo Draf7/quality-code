@@ -92,4 +92,15 @@ export class Order {
     this.status = OrderStatus.SHIPPED;
   }
 
+  addShippingAddress(shippingAddress: string): void {
+    if (!this.orderItems || this.orderItems.length <= 3) {
+      throw new Error("L'ajout de l'adresse de livraison n'est possible que si la commande contient plus de 3 items.");
+    }
+
+    this.price += Order.DELIVERY_FEE;
+
+    this.shippingAddress = shippingAddress;
+    this.shippingAddressSetAt = new Date();
+  }
+
 }
