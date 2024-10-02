@@ -1,4 +1,4 @@
-import { OrderItem } from '../entity/order-item.entity';
+import { ItemDetailCommand, OrderItem } from '../entity/order-item.entity';
 import {
   Column,
   CreateDateColumn,
@@ -7,8 +7,15 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Expose } from 'class-transformer';
+
 import { BadRequestException } from '@nestjs/common';
-import { CreateOrderCommand, ItemDetailCommand } from '../use-case/create-order.service';
+
+export interface CreateOrderCommand {
+  items: ItemDetailCommand[];
+  customerName: string;
+  shippingAddress: string;
+  invoiceAddress: string;
+}
 
 export enum OrderStatus {
   PENDING = 'PENDING',
@@ -22,9 +29,12 @@ export enum OrderStatus {
 @Entity()
 export class Order {
   static MAX_ITEMS = 5;
+
   static AMOUNT_MINIMUM = 5;
-  static SHIPPING_COST = 5;
+
   static AMOUNT_MAXIMUM = 500;
+
+  static SHIPPING_COST = 5;
 
   @CreateDateColumn()
   @Expose({ groups: ['group_orders'] })
@@ -44,7 +54,6 @@ export class Order {
 
   @OneToMany(() => OrderItem, (orderItem) => orderItem.order, {
     nullable: true,
-    cascade: true,
   })
   @Expose({ groups: ['group_orders'] })
   orderItems: OrderItem[];
@@ -63,61 +72,88 @@ export class Order {
 
   @Column()
   @Expose({ groups: ['group_orders'] })
-  status: string;
+  private status: string;
 
   @Column({ nullable: true })
   @Expose({ groups: ['group_orders'] })
-  paidAt: Date | null;
+  private paidAt: Date | null;
 
   @Column({ nullable: true })
   @Expose({ groups: ['group_orders'] })
-  canceledAt: Date | null;  // Date d'annulation de la commande
+  private cancelAt: Date | null;
 
   @Column({ nullable: true })
   @Expose({ groups: ['group_orders'] })
-  cancellationReason: string | null;  // Raison de l'annulation
+  private cancelReason: string | null;
 
-  constructor(createOrderCommand: CreateOrderCommand) {
-    const { customerName, items, shippingAddress, invoiceAddress } = createOrderCommand;
+  // methode factory : permet de ne pas utiliser le constructor
+  // car le constructor est utilisé par typeorm
+  // public createOrder(createOrderCommand: CreateOrderCommand): Order {
+  //   this.verifyOrderCommandIsValid(createOrderCommand);
+  //   this.verifyMaxItemIsValid(createOrderCommand);
 
-    if (!customerName || !items || items.length === 0) {
-      throw new BadRequestException('Les informations client ou les articles de la commande sont manquants.');
+  //   this.orderItems = createOrderCommand.items.map(
+  //     (item) => new OrderItem(item),
+  //   );
+
+  //   this.customerName = createOrderCommand.customerName;
+  //   this.shippingAddress = createOrderCommand.shippingAddress;
+  //   this.invoiceAddress = createOrderCommand.invoiceAddress;
+  //   this.status = OrderStatus.PENDING;
+  //   this.price = this.calculateOrderAmount(createOrderCommand.items);
+
+  //   return this;
+  // }
+
+  public constructor(createOrderCommand?: CreateOrderCommand) {
+    if (!createOrderCommand) {
+      return;
     }
 
-    if (items.length > Order.MAX_ITEMS) {
-      throw new BadRequestException(
-        `Impossible de passer une commande avec plus de ${Order.MAX_ITEMS} articles.`,
-      );
-    }
+    this.verifyOrderCommandIsValid(createOrderCommand);
+    this.verifyMaxItemIsValid(createOrderCommand);
 
-    const totalAmount = this.calculateOrderAmount(items);
+    this.orderItems = createOrderCommand.items.map(
+      (item) => new OrderItem(item),
+    );
 
-    if (totalAmount < Order.AMOUNT_MINIMUM) {
-      throw new BadRequestException(
-        `Le montant total de la commande ne peut pas être inférieur à ${Order.AMOUNT_MINIMUM}€.`,
-      );
-    }
-
-    this.customerName = customerName;
-    this.orderItems = this.mapItemsToOrderItems(items);
-    this.shippingAddress = shippingAddress;
-    this.invoiceAddress = invoiceAddress;
+    this.customerName = createOrderCommand.customerName;
+    this.shippingAddress = createOrderCommand.shippingAddress;
+    this.invoiceAddress = createOrderCommand.invoiceAddress;
     this.status = OrderStatus.PENDING;
-    this.price = totalAmount;
-    this.createdAt = new Date();
+    this.price = this.calculateOrderAmount(createOrderCommand.items);
+  }
+
+  private verifyMaxItemIsValid(createOrderCommand: CreateOrderCommand) {
+    if (createOrderCommand.items.length > Order.MAX_ITEMS) {
+      throw new BadRequestException(
+        'Cannot create order with more than 5 items',
+      );
+    }
+  }
+
+  private verifyOrderCommandIsValid(createOrderCommand: CreateOrderCommand) {
+    if (
+      !createOrderCommand.customerName ||
+      !createOrderCommand.items ||
+      createOrderCommand.items.length === 0 ||
+      !createOrderCommand.shippingAddress ||
+      !createOrderCommand.invoiceAddress
+    ) {
+      throw new BadRequestException('Missing required fields');
+    }
   }
 
   private calculateOrderAmount(items: ItemDetailCommand[]): number {
-    return items.reduce((sum, item) => sum + item.price, 0);
-  }
+    const totalAmount = items.reduce((sum, item) => sum + item.price, 0);
 
-  private mapItemsToOrderItems(items: ItemDetailCommand[]): OrderItem[] {
-    return items.map((item) => {
-      const orderItem = new OrderItem();
-      orderItem.productName = item.productName;
-      orderItem.price = item.price;
-      return orderItem;
-    });
+    if (totalAmount < Order.AMOUNT_MINIMUM) {
+      throw new BadRequestException(
+        `Cannot create order with total amount less than ${Order.AMOUNT_MINIMUM}€`,
+      );
+    }
+
+    return totalAmount;
   }
 
   pay(): void {
@@ -141,7 +177,7 @@ export class Order {
       throw new Error('Commande non payée');
     }
 
-    if (this.orderItems.length > Order.MAX_ITEMS) {
+    if (this.orderItems.length < Order.MAX_ITEMS) {
       throw new Error('Trop d’articles');
     }
 
@@ -149,5 +185,32 @@ export class Order {
     this.shippingAddressSetAt = new Date();
     this.shippingAddress = customerAddress;
     this.price += Order.SHIPPING_COST;
+  }
+
+  setInvoiceAddress(invoiceAddress?: string): void {
+    if (this.status !== OrderStatus.SHIPPING_ADDRESS_SET) {
+      throw new Error('Adresse de livraison non définie');
+    }
+
+    if (!invoiceAddress) {
+      this.invoiceAddress = this.shippingAddress;
+      return;
+    }
+
+    this.invoiceAddress = invoiceAddress;
+  }
+
+  cancel(cancelReason: string): void {
+    if (
+      this.status === OrderStatus.SHIPPED ||
+      this.status === OrderStatus.DELIVERED ||
+      this.status === OrderStatus.CANCELED
+    ) {
+      throw new Error('Vous ne pouvez pas annuler cette commande');
+    }
+
+    this.status = OrderStatus.CANCELED;
+    this.cancelAt = new Date('NOW');
+    this.cancelReason = cancelReason;
   }
 }
